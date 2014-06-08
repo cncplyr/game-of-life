@@ -3,15 +3,214 @@
 <head>
 	<title>Conway's Game of Life</title>
 	
+	<style>
+		body{ background-color: #1C2536; }
+		button{ coutline: none; -webkit-border-radius: .25em; border: solid 1px #FFFFFF; background-color: #FFFFFF; color: #1C2536; }
+	</style>
+	
 	<!-- 3rd Party -->
 	<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.0/jquery.min.js"></script>
-	<link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
-	<script src="//netdna.bootstrapcdn.com/bootstrap/3.1.1/js/bootstrap.min.js"></script>
 </head>
 <body>
 	<a href="https://github.com/cncplyr/game-of-life"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/a6677b08c955af8400f44c6298f40e7d19cc5b2d/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f677261795f3664366436642e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png"></a>
 
-	<p>Placeholder</p>
+	<button type="button" onclick="refresh();">Refresh Grid</button>
+	<button type="button" onclick="clearGrid();">Clear</button>
+	<button type="button" onclick="next();">Next</button>
+	<button type="button" id="run" onclick="toggleRun();">Run</button>
+	<br>
+	<canvas id="canvas" width="800" height="450"></canvas>
+	
+	<script type="text/javascript">
+	
+	var arr;
+	var game;
+	var canvas;
+	var running = false;
+	
+	/**
+	 * make an m-by-n 2d array
+	 */
+	function makeArray(cols, rows) {
+		array = [];
+		for (var i = 0; i < rows; i++) {
+			array[i] = [];
+			for (var j =0; j < cols; j++) {
+				array[i][j] = Math.floor(Math.random() * 2);
+			}
+		}
+		return array;
+	}
+	
+	function draw(g) {
+		canvas.width = canvas.width; // clears the canvas
+		var block = canvas.getContext("2d");
+		block.fillStyle = "rgb(252, 147, 2)";
+		x = g.x;
+		y = g.y;
+		array = g.grid;
+		size = g.blockSize;
+		
+		// begin by filling in blocks
+		for (var i = 0; i < y; i++) {
+			for (var j = 0; j < x; j++) {
+				if (array[i][j] == 1) {
+					block.moveTo(i * size + (size / 2), j * size);
+					block.arc(i * size, j * size, size / 2, 0, 2 * Math.PI);
+				}
+			}
+		}
+		block.fill(); // fill the circles
+	}
+	
+	function drawGrid(block) {
+		// begin by drawing gridlines
+		block.lineWidth = 0.5;
+		for (var i = 0; i <= y; i++) {
+			block.moveTo(i * size, 0);
+			block.lineTo(i * size, size * x);
+			block.strokeStyle = "#999";
+		}
+		
+		for (var i = 0; i <= x; i++) {
+			block.moveTo(0, i * size);
+			block.lineTo(y * size, size * i);
+			block.strokeStyle = "#999";
+		}
+		
+		block.stroke(); // draw the lines
+	}
+	
+	function init(size, x, y) {
+		canvas = document.getElementById('canvas');
+		document.addEventListener("click", flip, false);
+		
+		game = {
+			grid: makeArray(x, y),
+			blockSize: size,
+			x: x,
+			y: y
+		};
+		draw(game);
+		setInterval('run()', 50);
+	}
+	
+	function refresh() {
+		game.grid = makeArray(game.x, game.y);
+		draw(game);
+	}
+	
+	function clearGrid() {
+		var array = [];
+		for (var i = 0; i < game.y; i++) {
+			array[i] = [];
+			for (var j = 0; j < game.x; j++) {
+				array[i][j] = 0;
+			}
+		}
+		game.grid = array;
+		draw(game);
+	}
+	
+	function flip(e) {
+		var cell = getCursorPosition(e);
+		x = Math.floor(cell.row / game.blockSize);
+		y = Math.floor(cell.column / game.blockSize);
+		game.grid[x][y] = 1 - game.grid[x][y];
+		draw(game);
+	}
+	
+	function getCursorPosition(e) {
+			var x;
+			var y;
+			if (e.pageX != undefined && e.pageY!= undefined) {
+				x = e.pageX;
+				y = e.pageY;
+			} else {
+				x = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+				y = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+			}
+			
+			x -= canvas.offsetLeft;
+			y -= canvas.offsetTop;
+			
+			return {row: x, column: y};
+	}
+	
+	function next() {
+		var array = [];
+		for (var i = 0; i < game.y; i++) {
+			array[i] = [];
+			for (var j = 0; j < game.x; j++) {
+				n = countHood(j, i);
+				if (game.grid[i][j] == 0 && n == 3) {
+					array[i][j] = 1;
+				} else if (game.grid[i][j] == 1) {
+					if (n < 2) {
+						array[i][j] = 0;
+					}
+					if (n > 3) {
+						array[i][j] = 0;
+					}
+				}
+				if (array[i][j] == undefined) {
+					array[i][j] = game.grid[i][j];
+				}
+			}
+		}
+		game.grid = array;
+		draw(game);
+	}
+	
+	function countHood(x, y) {
+		var neighbours = 0;
+		for (var i = x-1; i < x + 2; i++) {
+			for (var j = y - 1; j < y + 2; j++) {
+				posX = i;
+				posY = j;
+				
+				// wrap around in both dimensions (toroid)
+				if (i < 0) {
+					posX = game.x - 1; 
+				} else if (i >= game.x) {
+					posX = 0;
+				}
+				
+				if (j < 0) {
+					posY = game.y - 1; 
+				} else if (j >= game.y) { 
+					posY = 0; 
+				}
+				
+				if (i == x && j == y) { continue; }
+				
+				neighbours += game.grid[posY][posX];
+			}
+		}
+		
+		return neighbours;
+	}
+	
+	function run() {
+		if (running) {
+			next();
+		}
+	}
+	
+	function toggleRun() {
+		var button = document.getElementById('run');
+		if (running) {
+			running = false;
+			button.innerHTML = 'Run!';
+		} else { 
+			running = true;
+			button.innerHTML = 'Stop!';
+		}
+	}
+	
+	init(5, 80,200);
+	
+	</script>
 	
 </body>
 </html>
