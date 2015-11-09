@@ -1,1 +1,3 @@
-# Nothing ignored for now!
+### JetBrains
+*.iml
+.idea/
